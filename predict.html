@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Predict - Prediction League</title>
+  <meta name="theme-color" content="#123a24" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Prediction League</h1>
+    <nav>
+      <a href="index.html">Leaderboard</a>
+      <a href="predict.html" class="active">Predict</a>
+      <a href="fixtures.html">Fixtures</a>
+    </nav>
+  </header>
+
+  <main>
+    <div id="status" class="status">Loading fixtures...</div>
+    <div id="fixture-list"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="league-scoring.js"></script>
+  <script>
+    const statusEl = document.getElementById('status');
+    const listEl = document.getElementById('fixture-list');
+    let player = null;
+
+    function showStatus(message, isError) {
+      statusEl.textContent = message;
+      statusEl.className = 'status ' + (isError ? 'err' : 'ok');
+      statusEl.hidden = false;
+    }
+
+    function fixtureCard(fixture, myPrediction) {
+      const kickoff = new Date(fixture.kickoff_at).toLocaleString([], {
+        weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+      });
+
+      return `
+        <div class="card" data-fixture-id="${fixture.id}">
+          <div class="fixture-teams">${fixture.home_team} vs ${fixture.away_team}</div>
+          <div class="fixture-meta">Kicks off ${kickoff}</div>
+          <div class="odds-row">
+            <span>Home ${fixture.odds_home ?? '-'}</span>
+            <span>Draw ${fixture.odds_draw ?? '-'}</span>
+            <span>Away ${fixture.odds_away ?? '-'}</span>
+          </div>
+          <div class="score-inputs">
+            <input type="number" min="0" max="15" class="home-score" value="${myPrediction?.predicted_home_score ?? ''}" />
+            <span>-</span>
+            <input type="number" min="0" max="15" class="away-score" value="${myPrediction?.predicted_away_score ?? ''}" />
+            <button class="save-btn">${myPrediction ? 'Update pick' : 'Save pick'}</button>
+          </div>
+          <div class="points-preview">Enter a score to see how many points it could be worth.</div>
+        </div>
+      `;
+    }
+
+    function wireCard(cardEl, fixture) {
+      const homeInput = cardEl.querySelector('.home-score');
+      const awayInput = cardEl.querySelector('.away-score');
+      const preview = cardEl.querySelector('.points-preview');
+      const saveBtn = cardEl.querySelector('.save-btn');
+
+      function updatePreview() {
+        const home = Number(homeInput.value);
+        const away = Number(awayInput.value);
+        if (homeInput.value === '' || awayInput.value === '') {
+          preview.textContent = 'Enter a score to see how many points it could be worth.';
+          return;
+        }
+        const points = previewPoints(fixture, home, away);
+        preview.textContent = points
+          ? `Worth ${points.ifCorrectWinner} pts if you get the winner right, ${points.ifExactScore} pts if you nail the exact score.`
+          : "Odds aren't loaded for this fixture yet.";
+      }
+
+      homeInput.addEventListener('input', updatePreview);
+      awayInput.addEventListener('input', updatePreview);
+      updatePreview();
+
+      saveBtn.addEventListener('click', async () => {
+        const home = Number(homeInput.value);
+        const away = Number(awayInput.value);
+        if (homeInput.value === '' || awayInput.value === '') {
+          alert('Enter both scores first.');
+          return;
+        }
+        if (home < 0 || home > 15 || away < 0 || away > 15) {
+          alert('Scores have to be between 0 and 15.');
+          return;
+        }
+
+        const { error } = await db.from('predictions').upsert(
+          {
+            player_id: player.id,
+            fixture_id: fixture.id,
+            predicted_home_score: home,
+            predicted_away_score: away,
+          },
+          { onConflict: 'player_id,fixture_id' }
+        );
+
+        if (error) {
+          alert(`Couldn't save your pick: ${error.message}`);
+          return;
+        }
+
+        saveBtn.textContent = 'Saved!';
+        setTimeout(() => (saveBtn.textContent = 'Update pick'), 1500);
+      });
+    }
+
+    async function loadFixtures() {
+      player = await ensurePlayer();
+
+      const { data: fixtures, error } = await db
+        .from('fixtures')
+        .select('*')
+        .eq('status', 'scheduled')
+        .gt('kickoff_at', new Date().toISOString())
+        .order('kickoff_at');
+
+      if (error) {
+        showStatus(`Couldn't load fixtures: ${error.message}`, true);
+        return;
+      }
+
+      if (fixtures.length === 0) {
+        showStatus('No upcoming fixtures loaded yet -- run the fetch-odds script (see README).');
+        return;
+      }
+
+      const { data: myPredictions } = await db
+        .from('predictions')
+        .select('*')
+        .eq('player_id', player.id);
+
+      const myPredictionsByFixture = new Map((myPredictions || []).map((p) => [p.fixture_id, p]));
+
+      statusEl.hidden = true;
+      listEl.innerHTML = fixtures.map((f) => fixtureCard(f, myPredictionsByFixture.get(f.id))).join('');
+
+      listEl.querySelectorAll('.card').forEach((cardEl) => {
+        const fixture = fixtures.find((f) => f.id === cardEl.dataset.fixtureId);
+        wireCard(cardEl, fixture);
+      });
+    }
+
+    loadFixtures();
+  </script>
+</body>
+</html>

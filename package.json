@@ -1,0 +1,17 @@
+{
+  "name": "prediction-league",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Odds-weighted score prediction league for friends",
+  "type": "module",
+  "scripts": {
+    "fetch-odds": "node scripts/fetch-odds.js",
+    "fetch-results": "node scripts/fetch-results.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2",
+    "dotenv": "^16",
+    "node-fetch": "^3",
+    "ws": "^8.21.1"
+  }
+}

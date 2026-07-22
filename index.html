@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prediction League</title>
+  <meta name="theme-color" content="#123a24" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Prediction League</h1>
+    <nav>
+      <a href="index.html" class="active">Leaderboard</a>
+      <a href="predict.html">Predict</a>
+      <a href="fixtures.html">Fixtures</a>
+    </nav>
+  </header>
+
+  <main>
+    <div id="status" class="status">Loading leaderboard...</div>
+    <table id="leaderboard" hidden>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th class="points">Points</th>
+          <th class="points">Exact scores</th>
+        </tr>
+      </thead>
+      <tbody id="leaderboard-body"></tbody>
+    </table>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="supabase-client.js"></script>
+  <script>
+    const statusEl = document.getElementById('status');
+    const table = document.getElementById('leaderboard');
+    const tbody = document.getElementById('leaderboard-body');
+
+    function showStatus(message, isError) {
+      statusEl.textContent = message;
+      statusEl.className = 'status ' + (isError ? 'err' : 'ok');
+      statusEl.hidden = false;
+    }
+
+    async function loadLeaderboard() {
+      // Every prediction with a points value (points is only filled in
+      // once its fixture is marked finished), plus the player's id/name and
+      // the fixture's actual score (to work out exact hits), both via
+      // Supabase's automatic foreign-key joins.
+      const { data, error } = await db
+        .from('predictions')
+        .select('points, predicted_home_score, predicted_away_score, players(id, display_name), fixtures(home_score, away_score)')
+        .not('points', 'is', null);
+
+      if (error) {
+        showStatus(`Couldn't load the leaderboard: ${error.message}`, true);
+        return;
+      }
+
+      if (data.length === 0) {
+        showStatus('No results yet -- once matches finish and predictions are scored, standings show up here.');
+        return;
+      }
+
+      // Sum points (and count exact-score hits, used as a tiebreaker) per
+      // player, on the client -- fine at friends-league scale. Keyed by
+      // player id (names could theoretically collide in display, ids can't).
+      const totals = new Map();
+      for (const row of data) {
+        const { id, display_name } = row.players;
+        const existing = totals.get(id) || { display_name, points: 0, exact: 0 };
+        existing.points += Number(row.points);
+        if (row.predicted_home_score === row.fixtures.home_score && row.predicted_away_score === row.fixtures.away_score) {
+          existing.exact += 1;
+        }
+        totals.set(id, existing);
+      }
+
+      const ranked = [...totals.entries()].sort((a, b) => b[1].points - a[1].points || b[1].exact - a[1].exact);
+
+      tbody.innerHTML = ranked
+        .map(([id, { display_name, points, exact }], i) => `
+          <tr>
+            <td class="rank">${i + 1}</td>
+            <td><a href="player.html?id=${encodeURIComponent(id)}">${escapeHtml(display_name)}</a></td>
+            <td class="points">${points}</td>
+            <td class="points">${exact}</td>
+          </tr>
+        `)
+        .join('');
+
+      statusEl.hidden = true;
+      table.hidden = false;
+    }
+
+    loadLeaderboard();
+  </script>
+</body>
+</html>

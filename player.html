@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Player history - Prediction League</title>
+  <meta name="theme-color" content="#123a24" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1 id="page-title">Player history</h1>
+    <nav>
+      <a href="index.html">Leaderboard</a>
+      <a href="predict.html">Predict</a>
+      <a href="fixtures.html">Fixtures</a>
+    </nav>
+  </header>
+
+  <main>
+    <div id="status" class="status">Loading...</div>
+    <table id="history" hidden>
+      <thead>
+        <tr>
+          <th>Fixture</th>
+          <th>Predicted</th>
+          <th>Result</th>
+          <th>Points</th>
+        </tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="supabase-client.js"></script>
+  <script>
+    const statusEl = document.getElementById('status');
+    const table = document.getElementById('history');
+    const tbody = document.getElementById('history-body');
+    const titleEl = document.getElementById('page-title');
+
+    function showStatus(message, isError) {
+      statusEl.textContent = message;
+      statusEl.className = 'status ' + (isError ? 'err' : 'ok');
+      statusEl.hidden = false;
+    }
+
+    function formatKickoff(iso) {
+      return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
+    }
+
+    async function loadHistory() {
+      const playerId = new URLSearchParams(location.search).get('id');
+      if (!playerId) {
+        showStatus('No player selected -- go back to the leaderboard and click a name.', true);
+        return;
+      }
+
+      const { data: player, error: playerError } = await db
+        .from('players')
+        .select('display_name')
+        .eq('id', playerId)
+        .maybeSingle();
+
+      if (playerError || !player) {
+        showStatus("Couldn't find that player.", true);
+        return;
+      }
+
+      titleEl.textContent = `${player.display_name}'s predictions`;
+      document.title = `${player.display_name} - Prediction League`;
+
+      // Row Level Security only returns another player's predictions for
+      // fixtures that have already kicked off, so future/unplayed picks
+      // stay hidden here automatically -- same rule as everywhere else.
+      const { data: predictions, error } = await db
+        .from('predictions')
+        .select('predicted_home_score, predicted_away_score, points, fixtures(home_team, away_team, kickoff_at, home_score, away_score, status)')
+        .eq('player_id', playerId)
+        .order('fixtures(kickoff_at)', { ascending: false });
+
+      if (error) {
+        showStatus(`Couldn't load predictions: ${error.message}`, true);
+        return;
+      }
+
+      if (predictions.length === 0) {
+        showStatus('No visible predictions yet for this player (either they haven\'t picked anything, or their picks are for fixtures that haven\'t kicked off).');
+        return;
+      }
+
+      statusEl.hidden = true;
+      table.hidden = false;
+
+      tbody.innerHTML = predictions
+        .map((p) => {
+          const f = p.fixtures;
+          const result = f.status === 'finished' ? `${f.home_score} - ${f.away_score}` : '-';
+          const points = p.points ?? '-';
+          return `
+            <tr>
+              <td>
+                ${escapeHtml(f.home_team)} vs ${escapeHtml(f.away_team)}
+                <div class="fixture-meta">${formatKickoff(f.kickoff_at)}</div>
+              </td>
+              <td>${p.predicted_home_score} - ${p.predicted_away_score}</td>
+              <td>${result}</td>
+              <td class="points">${points}</td>
+            </tr>
+          `;
+        })
+        .join('');
+    }
+
+    loadHistory();
+  </script>
+</body>
+</html>

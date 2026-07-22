@@ -1,0 +1,25 @@
+name: Fetch results
+
+# Every 4 hours, every day. Running it on days with no finished matches is
+# harmless (it just reports "0 finished" and does nothing) -- simpler than
+# trying to precisely target matchday windows, and nowhere close to The
+# Odds API's free 500-requests/month limit even running this often.
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch: # lets you also trigger this manually from the Actions tab
+
+jobs:
+  fetch-results:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npm run fetch-results
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
