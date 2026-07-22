@@ -101,10 +101,15 @@ bring it up to date -- currently
 table predictions" -- run it even if scoring feels fine, since it's what
 actually lets predictions save at all),
 [`004_lock_odds_at_prediction_time.sql`](sql/migrations/004_lock_odds_at_prediction_time.sql)
-(see "Weekly timeline" below for why), and
+(see "Weekly timeline" below for why),
 [`005_fix_lock_odds_retrigger_bug.sql`](sql/migrations/005_fix_lock_odds_retrigger_bug.sql)
 (run this even if you already ran 004 -- it fixes a bug where finishing a
-fixture could silently overwrite everyone's locked odds).
+fixture could silently overwrite everyone's locked odds), and
+[`006_relock_odds_on_fixture_change.sql`](sql/migrations/006_relock_odds_on_fixture_change.sql)
+(closes a scoring exploit 005 left open -- because 005 only compared the
+predicted scores, a player could lock in a big underdog's odds and then
+move that prediction to a different fixture, keeping the generous odds.
+Run this one before you share the site with anyone).
 
 Points are always calculated server-side, in the database, triggered
 automatically when a fixture's result is entered -- never trusted from the
