@@ -40,6 +40,21 @@ header h1 {
   margin: 0;
 }
 
+.player-badge {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.player-badge strong {
+  color: var(--text);
+}
+
+.player-badge .badge-points {
+  color: var(--win);
+  font-weight: 700;
+}
+
 nav {
   display: flex;
   gap: 1rem;

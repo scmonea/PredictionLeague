@@ -71,6 +71,30 @@ async function ensurePlayer() {
 
 window.ensurePlayer = ensurePlayer;
 
+// Renders "Logged in as X · Y pts" into a #player-badge element, if the
+// page has one -- lets a player confirm at a glance which identity their
+// session is using. That matters now that claim_player() means a lost
+// session could reattach to any name (see ensurePlayer() above), not just
+// their own. Pass an already-resolved player to avoid a second lookup on
+// pages that already called ensurePlayer(); omit it to resolve one here.
+async function showPlayerBadge(player) {
+  const badge = document.getElementById('player-badge');
+  if (!badge) return;
+
+  player = player || (await ensurePlayer());
+
+  const { data } = await db
+    .from('predictions')
+    .select('points')
+    .eq('player_id', player.id)
+    .not('points', 'is', null);
+
+  const total = (data || []).reduce((sum, p) => sum + Number(p.points), 0);
+  badge.innerHTML = `Logged in as <strong>${escapeHtml(player.display_name)}</strong> &middot; <span class="badge-points">${total} pt${total === 1 ? '' : 's'}</span>`;
+}
+
+window.showPlayerBadge = showPlayerBadge;
+
 // Display names are free text someone types in, so they must never be
 // dropped straight into innerHTML -- this turns "<" etc into safe text.
 function escapeHtml(str) {
