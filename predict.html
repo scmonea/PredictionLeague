@@ -22,10 +22,11 @@
 
   <main>
     <p class="hint">
-      Enter the score you predict, then hit <strong>Save pick</strong> to
-      lock it in -- you can change it as many times as you like right up
-      until that fixture kicks off. Fixtures refresh weekly with that
-      day's odds. <a href="info.html">More on how this works &rarr;</a>
+      Enter the score you predict -- it saves automatically as soon as you
+      move to the next field, no button needed. Change it as many times as
+      you like right up until that fixture kicks off. Fixtures refresh
+      weekly with that day's odds.
+      <a href="info.html">More on how this works &rarr;</a>
     </p>
     <div id="status" class="status">Loading fixtures...</div>
     <div id="fixture-list"></div>
@@ -63,7 +64,7 @@
             <input type="number" min="0" max="15" class="home-score" value="${myPrediction?.predicted_home_score ?? ''}" />
             <span>-</span>
             <input type="number" min="0" max="15" class="away-score" value="${myPrediction?.predicted_away_score ?? ''}" />
-            <button class="save-btn">${myPrediction ? 'Update pick' : 'Save pick'}</button>
+            <span class="save-status"></span>
           </div>
           <div class="points-preview">Enter a score to see how many points it could be worth.</div>
         </div>
@@ -74,7 +75,8 @@
       const homeInput = cardEl.querySelector('.home-score');
       const awayInput = cardEl.querySelector('.away-score');
       const preview = cardEl.querySelector('.points-preview');
-      const saveBtn = cardEl.querySelector('.save-btn');
+      const saveStatus = cardEl.querySelector('.save-status');
+      let saveStatusTimer = null;
 
       function updatePreview() {
         const home = Number(homeInput.value);
@@ -97,40 +99,79 @@
         preview.textContent = `${points.ifCorrectWinner} pts for the correct result, ${points.ifExactScore} pts for the correct score.`;
       }
 
-      homeInput.addEventListener('input', updatePreview);
-      awayInput.addEventListener('input', updatePreview);
-      updatePreview();
+      function showSaveStatus(message, isError) {
+        clearTimeout(saveStatusTimer);
+        saveStatus.textContent = message;
+        saveStatus.classList.toggle('err', !!isError);
+        if (!isError) {
+          saveStatusTimer = setTimeout(() => (saveStatus.textContent = ''), 2000);
+        }
+      }
 
-      saveBtn.addEventListener('click', async () => {
+      // Saves as soon as a player finishes editing a field (blur), instead
+      // of needing a separate button -- one fewer thing to remember to
+      // click. Only actually saves once BOTH fields have a value; if only
+      // one is filled in so far, this just waits quietly rather than
+      // nagging with an error.
+      async function autoSave() {
+        if (homeInput.value === '' || awayInput.value === '') return;
+
         const home = Number(homeInput.value);
         const away = Number(awayInput.value);
-        if (homeInput.value === '' || awayInput.value === '') {
-          alert('Enter both scores first.');
-          return;
-        }
         if (home < 0 || home > 15 || away < 0 || away > 15) {
-          alert('Scores have to be between 0 and 15.');
+          showSaveStatus('Scores have to be between 0 and 15.', true);
           return;
         }
 
-        const { error } = await db.from('predictions').upsert(
-          {
-            player_id: player.id,
-            fixture_id: fixture.id,
-            predicted_home_score: home,
-            predicted_away_score: away,
-          },
-          { onConflict: 'player_id,fixture_id' }
-        );
+        const { data, error } = await db
+          .from('predictions')
+          .upsert(
+            {
+              player_id: player.id,
+              fixture_id: fixture.id,
+              predicted_home_score: home,
+              predicted_away_score: away,
+            },
+            { onConflict: 'player_id,fixture_id' }
+          )
+          .select();
+
+        // Code 42501 is Postgres's row-level-security violation -- the one
+        // way this fires in practice is the kickoff-lock policy in
+        // schema.sql rejecting an edit because the fixture already
+        // started since this page loaded. Lock the fields instead of
+        // leaving them editable but permanently failing to save.
+        if (error?.code === '42501') {
+          showSaveStatus("Couldn't save -- this match has already kicked off.", true);
+          homeInput.disabled = true;
+          awayInput.disabled = true;
+          return;
+        }
 
         if (error) {
-          alert(`Couldn't save your pick: ${error.message}`);
+          showSaveStatus(`Couldn't save: ${error.message}`, true);
           return;
         }
 
-        saveBtn.textContent = 'Saved!';
-        setTimeout(() => (saveBtn.textContent = 'Update pick'), 1500);
-      });
+        // Belt-and-braces: an upsert blocked by RLS has always come back
+        // as the 42501 error above in testing, never a silent empty
+        // result -- but handle it the same way just in case that ever
+        // changes.
+        if (!data || data.length === 0) {
+          showSaveStatus("Couldn't save -- this match has already kicked off.", true);
+          homeInput.disabled = true;
+          awayInput.disabled = true;
+          return;
+        }
+
+        showSaveStatus('Pick updated', false);
+      }
+
+      homeInput.addEventListener('input', updatePreview);
+      awayInput.addEventListener('input', updatePreview);
+      homeInput.addEventListener('blur', autoSave);
+      awayInput.addEventListener('blur', autoSave);
+      updatePreview();
     }
 
     async function loadFixtures() {

@@ -142,6 +142,16 @@ h2 {
   color: var(--text-dim);
 }
 
+.score-inputs .save-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--win);
+}
+
+.score-inputs .save-status.err {
+  color: var(--loss);
+}
+
 button {
   background: var(--win);
   color: #06170e;
