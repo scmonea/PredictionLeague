@@ -183,16 +183,19 @@ EPL fixtures. The recommended weekly rhythm:
    the next batch of fixtures with fresh odds -- re-running it a few more
    times through the week (rather than just once) catches any fixture
    whose odds weren't posted by bookmakers yet on Tuesday, so nothing gets
-   left off the list.
+   left off the list. It only ever *adds* a fixture the first time it's
+   found, though -- a fixture already saved (normally from Tuesday) keeps
+   those exact odds all week; the Wed-Fri runs never overwrite them, even
+   though the real bookmaker price keeps moving underneath. What players
+   see for an already-listed fixture stays put until next week's cycle.
 2. **Tuesday through kickoff** -- players can predict (or change their
    mind) on any fixture, right up until *that specific match's* kickoff --
    each fixture locks independently, not the whole gameweek at once.
 3. **The moment a pick saves**, the odds for that chosen outcome are
-   captured permanently into it (`locked_odds` in the database).
-   Re-running `fetch-odds` later -- even for the same fixture -- can never
-   change what an already-saved pick is worth. This is what makes the
-   timeline unambiguous: whatever the odds were the moment a pick was
-   saved is what it's scored against, full stop.
+   captured permanently into it (`locked_odds` in the database). This is
+   what makes the timeline unambiguous: whatever the odds were the moment
+   a pick was saved is what it's scored against, full stop -- doubly so
+   now that the fixture's own odds don't even change underneath it.
 4. **After the gameweek's matches finish** -- run `npm run fetch-results`
    to pull in final scores and trigger scoring.
 

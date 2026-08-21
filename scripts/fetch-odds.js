@@ -73,12 +73,33 @@ async function main() {
     return;
   }
 
-  // Upsert on external_id: re-running this script updates existing
-  // fixtures with fresh odds instead of creating duplicates.
-  const { error } = await supabase.from('fixtures').upsert(rows, { onConflict: 'external_id' });
+  // Only ever save a fixture's odds the FIRST time it's found -- this
+  // script re-runs Tuesday through Friday (see fetch-odds.yml) purely to
+  // catch fixtures that were still missing odds on an earlier run, not to
+  // refresh odds for ones already saved. Without this, a fixture's odds
+  // would silently drift every day it's re-fetched, which would also mean
+  // two players predicting the same fixture on different days could lock
+  // in different odds despite nothing actually being "new". So: look up
+  // which of this run's fixtures already exist, and only insert the ones
+  // that don't -- an existing fixture's odds are never touched again.
+  const { data: existing, error: existingError } = await supabase
+    .from('fixtures')
+    .select('external_id')
+    .in('external_id', rows.map((r) => r.external_id));
+  if (existingError) throw existingError;
+
+  const existingIds = new Set((existing || []).map((f) => f.external_id));
+  const newRows = rows.filter((r) => !existingIds.has(r.external_id));
+
+  if (newRows.length === 0) {
+    console.log('Nothing new to save -- every fixture with odds this run was already saved in an earlier run this week.');
+    return;
+  }
+
+  const { error } = await supabase.from('fixtures').insert(newRows);
   if (error) throw error;
 
-  console.log(`Saved ${rows.length} fixtures to Supabase.`);
+  console.log(`Saved ${newRows.length} new fixture(s) to Supabase (${rows.length - newRows.length} already existed and were left untouched).`);
 }
 
 // Turns one event from The Odds API's response into a row matching our

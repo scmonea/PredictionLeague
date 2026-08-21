@@ -5,8 +5,9 @@ name: Fetch odds
 # section in README.md), but bookmakers don't always have odds posted for
 # every fixture that early. Re-running it a few more times through the
 # week catches any fixture whose odds show up late, well before Friday's
-# kickoff -- upserting on external_id means this only ever refreshes
-# fixtures, never duplicates them.
+# kickoff. It never re-saves a fixture that's already there, though --
+# see the comment in scripts/fetch-odds.js -- so a fixture's odds are set
+# once, on whichever run first finds it, and don't drift afterwards.
 on:
   schedule:
     - cron: "0 9 * * 2-5"
