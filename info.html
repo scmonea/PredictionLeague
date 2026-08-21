@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scoring - Prediction League</title>
+  <title>Info - Prediction League</title>
   <meta name="theme-color" content="#1e1033" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
@@ -15,12 +15,23 @@
     <nav>
       <a href="index.html">Leaderboard</a>
       <a href="predict.html">Predict</a>
-      <a href="scoring.html" class="active">Scoring</a>
+      <a href="info.html" class="active">Info</a>
     </nav>
   </header>
 
   <main>
     <div class="card">
+      <h2 style="margin-top: 0">How to use it</h2>
+      <ul>
+        <li>Pick a display name the first time you visit -- that's your identity for the season.</li>
+        <li>On <strong>Predict</strong>, enter the score you think each fixture will end, then hit <strong>Save pick</strong>.</li>
+        <li>Change your mind as many times as you like -- a pick only locks the moment that fixture kicks off.</li>
+        <li>Click any name on the <strong>Leaderboard</strong> to see their full pick history.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top: 0">Scoring</h2>
       <p>
         Every match has odds for each result (home win / draw / away win),
         set by bookmakers. When you predict a scoreline, you're backing one
@@ -33,6 +44,16 @@
         <li>Right side, any score &rarr; <strong>the decimal odds you backed, rounded down.</strong></li>
         <li>Right side <em>and</em> the goal difference also matches (even if the score itself isn't exact) &rarr; <strong>bonus points based on the margin</strong>: a 2-goal margin is worth +1, 3 is worth +2, up to a cap of +5 for a 6+ goal margin. A margin of 0-1 (most results) earns nothing here.</li>
         <li>Right side <em>and</em> the exact score too &rarr; <strong>+3 more</strong> on top of that.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top: 0">Fixtures &amp; odds</h2>
+      <ul>
+        <li>Fixtures and odds refresh weekly, pulling that day's real bookmaker prices.</li>
+        <li>Normally around 10 fixtures show up at once -- all 20 Premier League clubs play once a gameweek -- occasionally fewer if a match's odds aren't posted yet when they're fetched.</li>
+        <li>The odds shown when you hit Save are locked to that pick permanently -- odds moving afterwards, or a later refresh, can never change what you're scored against.</li>
+        <li>Each fixture locks independently at its own kickoff, not the whole gameweek at once.</li>
       </ul>
     </div>
   </main>

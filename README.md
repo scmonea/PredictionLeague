@@ -63,9 +63,10 @@ free, so the formula is:
 - **+ exact-score bonus** on top of that if the scoreline was also exactly right: a flat **+3** more. An exact score always matches the goal difference too, so this always stacks with the goal-difference bonus above, not instead of it.
 
 A short, plain-language version of the four rules above (no worked
-examples, no maintainer detail) lives on [`scoring.html`](scoring.html) --
-link players there if the formula itself needs explaining, rather than
-this README.
+examples, no maintainer detail) lives in the "Scoring" section of
+[`info.html`](info.html) -- along with how-to-use and fixtures/odds
+sections. Link players there if any of this needs explaining, rather
+than this README.
 
 The exact-score bonus is *not* scaled by odds -- a correct exact score on
 a huge underdog could otherwise add way more than one on a favorite. It's
@@ -257,7 +258,7 @@ for that move.
 index.html            Leaderboard (landing page) -- click a name for their prediction history
 predict.html           Submit/edit your picks for upcoming fixtures
 player.html             One player's full prediction history (linked from the leaderboard)
-scoring.html             Plain-language explanation of the scoring rules, for players
+info.html                Player-facing info: how to use it, scoring rules, fixtures & odds
 styles.css               Shared styling for every page
 supabase-client.js        Supabase connection + anonymous sign-in + name claim + HTML-escaping helper
 league-scoring.js          Scoring formula (shared with the SQL trigger, kept in sync by hand)
