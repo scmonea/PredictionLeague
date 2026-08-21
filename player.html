@@ -74,13 +74,19 @@
       titleEl.textContent = `${player.display_name}'s predictions`;
       document.title = `${player.display_name} - Prediction League`;
 
-      // Row Level Security only returns another player's predictions for
-      // fixtures that have already kicked off, so future/unplayed picks
-      // stay hidden here automatically -- same rule as everywhere else.
+      // This is a history of completed games only -- upcoming/in-progress
+      // picks belong on Predict (where you can still edit your own), not
+      // here. `fixtures!inner` turns the join into an INNER JOIN so the
+      // status filter actually excludes predictions, not just narrows
+      // what's shown within them. Row Level Security separately still
+      // hides another player's picks for anything that hasn't kicked off
+      // yet, but that's a distinct rule from "finished" -- a fixture can
+      // have kicked off and be mid-match without being finished yet.
       const { data: predictions, error } = await db
         .from('predictions')
-        .select('predicted_home_score, predicted_away_score, points, fixtures(home_team, away_team, kickoff_at, home_score, away_score, status)')
+        .select('predicted_home_score, predicted_away_score, points, fixtures!inner(home_team, away_team, kickoff_at, home_score, away_score, status)')
         .eq('player_id', playerId)
+        .eq('fixtures.status', 'finished')
         .order('fixtures(kickoff_at)', { ascending: false });
 
       if (error) {
@@ -89,7 +95,7 @@
       }
 
       if (predictions.length === 0) {
-        showStatus('No visible predictions yet for this player (either they haven\'t picked anything, or their picks are for fixtures that haven\'t kicked off).');
+        showStatus('No completed games yet for this player.');
         return;
       }
 
