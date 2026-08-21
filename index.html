@@ -49,13 +49,29 @@
     }
 
     async function loadLeaderboard() {
-      // Every prediction with a points value (points is only filled in
-      // once its fixture is marked finished), plus the player's id/name and
-      // the fixture's actual score (to work out exact hits), both via
-      // Supabase's automatic foreign-key joins.
+      // Start from every signed-up player, not just ones with a scored
+      // prediction -- so someone who's joined but hasn't predicted (or
+      // whose picks haven't been scored yet) still shows up, at 0.
+      const { data: players, error: playersError } = await db
+        .from('players')
+        .select('id, display_name');
+
+      if (playersError) {
+        showStatus(`Couldn't load the leaderboard: ${playersError.message}`, true);
+        return;
+      }
+
+      if (players.length === 0) {
+        showStatus('No players have signed up yet.');
+        return;
+      }
+
+      // Then layer in every prediction that's actually been scored (points
+      // is only filled in once its fixture is marked finished), plus the
+      // fixture's actual score, to work out exact hits.
       const { data, error } = await db
         .from('predictions')
-        .select('points, predicted_home_score, predicted_away_score, players(id, display_name), fixtures(home_score, away_score)')
+        .select('player_id, points, predicted_home_score, predicted_away_score, fixtures(home_score, away_score)')
         .not('points', 'is', null);
 
       if (error) {
@@ -63,23 +79,18 @@
         return;
       }
 
-      if (data.length === 0) {
-        showStatus('No results yet -- once matches finish and predictions are scored, standings show up here.');
-        return;
-      }
-
       // Sum points (and count exact-score hits, used as a tiebreaker) per
       // player, on the client -- fine at friends-league scale. Keyed by
       // player id (names could theoretically collide in display, ids can't).
-      const totals = new Map();
+      // Seeded with every player at 0 so nobody's missing from the table.
+      const totals = new Map(players.map((p) => [p.id, { display_name: p.display_name, points: 0, exact: 0 }]));
       for (const row of data) {
-        const { id, display_name } = row.players;
-        const existing = totals.get(id) || { display_name, points: 0, exact: 0 };
+        const existing = totals.get(row.player_id);
+        if (!existing) continue; // player was deleted after predicting; skip
         existing.points += Number(row.points);
         if (row.predicted_home_score === row.fixtures.home_score && row.predicted_away_score === row.fixtures.away_score) {
           existing.exact += 1;
         }
-        totals.set(id, existing);
       }
 
       const ranked = [...totals.entries()].sort((a, b) => b[1].points - a[1].points || b[1].exact - a[1].exact);
