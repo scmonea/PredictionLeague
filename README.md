@@ -176,20 +176,23 @@ night** (Friday night game, several Saturday kickoffs, a couple of Sunday
 games, often a Monday night finale). Tuesday-Thursday are normally free of
 EPL fixtures. The recommended weekly rhythm:
 
-1. **Tuesday** (or whenever suits that week) -- run `npm run fetch-odds`.
-   This is safely after every match from the previous gameweek has
-   finished (including a Monday night game), so you're never touching a
-   gameweek that's still in progress. It pulls in the next batch of
-   fixtures with fresh odds.
+1. **Tuesday through Friday mornings** -- `npm run fetch-odds` runs
+   automatically (see below). Tuesday is safely after every match from
+   the previous gameweek has finished (including a Monday night game), so
+   it's never touching a gameweek that's still in progress. It pulls in
+   the next batch of fixtures with fresh odds -- re-running it a few more
+   times through the week (rather than just once) catches any fixture
+   whose odds weren't posted by bookmakers yet on Tuesday, so nothing gets
+   left off the list.
 2. **Tuesday through kickoff** -- players can predict (or change their
    mind) on any fixture, right up until *that specific match's* kickoff --
    each fixture locks independently, not the whole gameweek at once.
-3. **The moment you save a pick**, the odds for your chosen outcome are
-   captured permanently into that prediction (`locked_odds` in the
-   database). Re-running `fetch-odds` later -- even for the same
-   fixture -- can never change what an already-saved pick is worth. This
-   is what makes the timeline unambiguous: whatever you saw when you hit
-   save is what you're scored against, full stop.
+3. **The moment a pick saves**, the odds for that chosen outcome are
+   captured permanently into it (`locked_odds` in the database).
+   Re-running `fetch-odds` later -- even for the same fixture -- can never
+   change what an already-saved pick is worth. This is what makes the
+   timeline unambiguous: whatever the odds were the moment a pick was
+   saved is what it's scored against, full stop.
 4. **After the gameweek's matches finish** -- run `npm run fetch-results`
    to pull in final scores and trigger scoring.
 
@@ -228,7 +231,7 @@ Once this repo is on GitHub, [`.github/workflows/`](.github/workflows) has two
 scheduled workflows that run your existing scripts for you, for free, using
 GitHub Actions:
 
-- **fetch-odds.yml** -- every Tuesday morning.
+- **fetch-odds.yml** -- Tuesday through Friday mornings, to catch any fixture whose odds weren't posted yet on an earlier run.
 - **fetch-results.yml** -- every 4 hours, every day (harmless on days with nothing finished).
 
 To enable them: go to the repo's **Settings -> Secrets and variables ->

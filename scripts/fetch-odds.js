@@ -58,6 +58,16 @@ async function main() {
   console.log(`Fetched ${events.length} upcoming EPL fixtures from The Odds API.`);
 
   const rows = events.map(eventToFixtureRow).filter(Boolean);
+
+  // Logged so a run that skips a fixture is visible in the Actions log,
+  // not silent -- this workflow re-runs a few times a week (see
+  // fetch-odds.yml), so a fixture skipped here should get picked up by a
+  // later run once its odds are posted.
+  const skipped = events.filter((e) => !eventToFixtureRow(e));
+  if (skipped.length > 0) {
+    console.log(`Skipped ${skipped.length} fixture(s) with no bookmaker odds yet: ${skipped.map((e) => `${e.home_team} vs ${e.away_team}`).join(', ')}`);
+  }
+
   if (rows.length === 0) {
     console.log('Nothing to save -- none of the fetched events had bookmaker odds yet.');
     return;
