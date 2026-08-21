@@ -235,7 +235,7 @@ scheduled workflows that run your existing scripts for you, for free, using
 GitHub Actions:
 
 - **fetch-odds.yml** -- Tuesday through Friday mornings, to catch any fixture whose odds weren't posted yet on an earlier run.
-- **fetch-results.yml** -- every 4 hours, every day (harmless on days with nothing finished).
+- **fetch-results.yml** -- every 2 hours, every day (harmless on days with nothing finished).
 
 To enable them: go to the repo's **Settings -> Secrets and variables ->
 Actions**, and add three **repository secrets** with the same values as

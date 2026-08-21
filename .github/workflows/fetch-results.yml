@@ -1,12 +1,17 @@
 name: Fetch results
 
-# Every 4 hours, every day. Running it on days with no finished matches is
+# Every 2 hours, every day. Running it on days with no finished matches is
 # harmless (it just reports "0 finished" and does nothing) -- simpler than
-# trying to precisely target matchday windows, and nowhere close to The
-# Odds API's free 500-requests/month limit even running this often.
+# trying to precisely target matchday windows. At 2 hours this is ~360
+# requests/month; combined with fetch-odds' ~17/month (Tue-Fri, see
+# fetch-odds.yml), that's comfortably under The Odds API's free
+# 500-requests/month limit, with room to spare for manual triggers.
+# (Was every 4 hours -- halved after a match finished with no points
+# awarded for close to an hour, since the automation simply hadn't had
+# its next turn yet.)
 on:
   schedule:
-    - cron: "0 */4 * * *"
+    - cron: "0 */2 * * *"
   workflow_dispatch: # lets you also trigger this manually from the Actions tab
 
 jobs:
