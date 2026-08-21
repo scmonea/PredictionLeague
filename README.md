@@ -58,35 +58,67 @@ Only win/draw/lose odds (not exact-score odds) are reliably available for
 free, so the formula is:
 
 - **Wrong winner/draw:** 0 points.
-- **Right winner/draw:** `round(4 * sqrt(decimal odds of that outcome))` points -- minus 2 (floored at 1) if the odds were below **1.5**, since backing a heavy favorite is a much safer pick than a toss-up or underdog and shouldn't score quite the same.
-- **+ exact-score bonus** on top if the scoreline was also exactly right: `round(2 * sqrt(same odds))`, capped at **6** so a huge longshot can't blow the bonus up indefinitely.
+- **Right winner/draw:** the decimal odds you backed, **rounded down**. Odds of 3.40 → 3 points. Odds of 1.15 → 1 point. Odds of 15.00 → 15 points. No square roots, no cap -- points track the bookmakers' odds directly, so the bigger the underdog, the more it's worth, in exact proportion to how unlikely they thought it was.
+- **+ goal-difference bonus** on top if the predicted goal difference also matches the actual one, even when the score itself isn't exact: scales with the size of the margin -- a 2-goal margin is worth **+1**, 3 is worth **+2**, up to a cap of **+5** for a 6+ goal margin. A margin of 0 or 1 (a draw, or a result like 1-0/2-1 -- most real matches) earns nothing here; this tier only rewards correctly calling a genuinely big margin.
+- **+ exact-score bonus** on top of that if the scoreline was also exactly right: a flat **+3** more. An exact score always matches the goal difference too, so this always stacks with the goal-difference bonus above, not instead of it.
 
-Both the base points and the bonus scale with how unlikely the pick was --
-correctly calling a big underdog is worth more, and *nailing the exact
-score* on a big underdog is worth more too (up to the cap). What doesn't
-matter is how big the scoreline itself is: predicting a 10-0 win is worth
-exactly the same as predicting 1-0 for the same team, since the formula
-only cares which side you backed and whether you hit the exact score --
-not the goal count. (Predicted scores are capped at 0-15 per side anyway,
-mostly just to stop silly numbers.)
+A short, plain-language version of the four rules above (no worked
+examples, no maintainer detail) lives on [`scoring.html`](scoring.html) --
+link players there if the formula itself needs explaining, rather than
+this README.
 
-Worked examples:
+The exact-score bonus is *not* scaled by odds -- a correct exact score on
+a huge underdog could otherwise add way more than one on a favorite. It's
+the same flat +3 no matter what you picked. The goal-difference bonus
+*is* scaled, but by margin size, not by odds -- predicting 10-9 and 1-0
+for the same team both have a goal difference of +1, so they'd earn the
+same (nothing) from this tier regardless of how unlikely the underlying
+odds were. (Predicted scores are capped at 0-15 per side anyway, mostly
+just to stop silly numbers.)
 
-| Odds picked | Correct winner only | + exact score |
-|---|---|---|
-| 1.15 (very heavy favorite) | 2 | 4 |
-| 1.30 (heavy favorite) | 3 | 5 |
-| 1.50+ (no penalty from here up) | 5 | 7 |
-| 2.00 (toss-up) | 6 | 9 |
-| 3.40 (draw) | 7 | 11 |
-| 8.00+ (underdog) | scales up | capped at base + 6 |
-| 20.00 (huge longshot) | 18 | 24 |
+Worked example: actual result is a 4-1 home win (goal difference +3),
+odds of 2.50 for that home win.
 
-The favorite penalty only applies below 1.50 odds; the bonus hits its +6
-cap once odds reach about 8-9, so from there up only the base points keep
-climbing.
+| You predicted | Base (odds) | + GD bonus | + exact bonus | Total |
+|---|---|---|---|---|
+| Away win | 0 (wrong side) | -- | -- | **0** |
+| 1-0 (GD +1, no match) | 2 | 0 | -- | **2** |
+| 3-0 (GD +3, matches) | 2 | +2 | -- | **4** |
+| 4-1 (exact) | 2 | +2 | +3 | **7** |
 
-These numbers (`4`, `2`, and the cap of `6`) live in one place in
+Base points by odds:
+
+| Odds picked | Right side, any score |
+|---|---|
+| 1.15 (very heavy favorite) | 1 |
+| 1.50 | 1 |
+| 2.00 (toss-up) | 2 |
+| 3.40 (draw) | 3 |
+| 7.00 (underdog) | 7 |
+| 15.00 (big underdog) | 15 |
+| 30.00 (huge longshot) | 30 |
+
+Goal-difference bonus by matched margin:
+
+| Matched margin | Bonus |
+|---|---|
+| 0 or 1 | 0 |
+| 2 | +1 |
+| 3 | +2 |
+| 4 | +3 |
+| 5 | +4 |
+| 6+ | +5 (capped) |
+
+This is a deliberately wide-open range with no cap on the base points --
+an earlier version capped them at 8 to limit how much a single long-shot
+pick could swing a season (see
+[`sql/migrations/008_reduce_longshot_variance.sql`](sql/migrations/008_reduce_longshot_variance.sql)),
+but the current formula (migration 009) reverts that in favor of points
+that track the odds directly and literally. The goal-difference bonus
+(migration 011) has its own, separate cap for the same reason.
+
+These numbers (the goal-difference cap of `5`, the flat `3` exact bonus,
+and `floor()` with no other constant on the base) live in one place in
 [`league-scoring.js`](league-scoring.js) (the live preview players see
 while picking) and are mirrored in the scoring function in
 [`sql/schema.sql`](sql/schema.sql) (which computes the real, trusted
@@ -109,7 +141,28 @@ fixture could silently overwrite everyone's locked odds), and
 (closes a scoring exploit 005 left open -- because 005 only compared the
 predicted scores, a player could lock in a big underdog's odds and then
 move that prediction to a different fixture, keeping the generous odds.
-Run this one before you share the site with anyone).
+Run this one before you share the site with anyone), and
+[`007_claim_player_by_name.sql`](sql/migrations/007_claim_player_by_name.sql)
+(lets someone reclaim their name -- case-insensitively, so "Josh" and
+"josh" are the same player -- from a new device/browser instead of being
+blocked. See the file for the trust trade-off this makes: it's name-only,
+no password, fine for a small trusted group and not otherwise), and
+[`008_reduce_longshot_variance.sql`](sql/migrations/008_reduce_longshot_variance.sql)
+(narrows the scoring formula's range and makes the exact-score bonus a
+flat +3 instead of odds-scaled, so one lucky long-shot pick can't swing a
+season as hard as it used to -- see "How scoring works" above), and
+[`009_odds_based_scoring.sql`](sql/migrations/009_odds_based_scoring.sql)
+(replaces 008's capped square-root formula with a direct one: a correct
+winner/draw is worth exactly the decimal odds you backed, rounded down,
+with no cap), and
+[`010_goal_difference_bonus.sql`](sql/migrations/010_goal_difference_bonus.sql)
+(adds a third scoring tier: a flat +1 for matching the actual goal
+difference even when the exact score isn't right, stacking with the
+existing +3 exact-score bonus), and
+[`011_scale_gd_bonus_by_margin.sql`](sql/migrations/011_scale_gd_bonus_by_margin.sql)
+(replaces 010's flat +1 with one that scales by the size of the matched
+margin -- +1 for a 2-goal margin up to +5 for a 6+ goal margin, with a
+margin of 0-1 earning nothing -- see "How scoring works" above).
 
 Points are always calculated server-side, in the database, triggered
 automatically when a fixture's result is entered -- never trusted from the
@@ -203,8 +256,8 @@ for that move.
 ```
 index.html            Leaderboard (landing page) -- click a name for their prediction history
 predict.html           Submit/edit your picks for upcoming fixtures
-fixtures.html           Full fixture list: upcoming odds + past results
 player.html             One player's full prediction history (linked from the leaderboard)
+scoring.html             Plain-language explanation of the scoring rules, for players
 styles.css               Shared styling for every page
 supabase-client.js        Supabase connection + anonymous sign-in + name claim + HTML-escaping helper
 league-scoring.js          Scoring formula (shared with the SQL trigger, kept in sync by hand)

@@ -3,12 +3,12 @@
 // This is what makes "Add to Home Screen" feel like a real app rather than
 // just a bookmark.
 
-const CACHE_NAME = 'prediction-league-v2';
+const CACHE_NAME = 'prediction-league-v3';
 const FILES_TO_CACHE = [
   'index.html',
   'predict.html',
-  'fixtures.html',
   'player.html',
+  'scoring.html',
   'styles.css',
   'supabase-client.js',
   'league-scoring.js',

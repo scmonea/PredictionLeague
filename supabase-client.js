@@ -33,6 +33,14 @@ async function ensureSignedIn() {
 // them to pick a display name the first time. Using a plain prompt() here
 // is a deliberate simplification for a friends-only test -- swap it for a
 // proper form later if this grows beyond messing around with mates.
+//
+// If they type a name that's already taken (e.g. because their previous
+// session was lost -- new device, cleared storage, an in-app browser that
+// doesn't persist local storage), claim_player() reassigns that existing
+// player row to this session instead of blocking them. There's no
+// password check, so this only works because it's a small trusted group
+// -- see sql/migrations/007_claim_player_by_name.sql for the full
+// trade-off.
 async function ensurePlayer() {
   const session = await ensureSignedIn();
 
@@ -49,19 +57,16 @@ async function ensurePlayer() {
     displayName = (prompt('Pick a display name for the league:') || '').trim();
   }
 
-  const { data: created, error } = await db
-    .from('players')
-    .insert({ auth_user_id: session.user.id, display_name: displayName })
-    .select()
-    .single();
+  const { data: claimed, error } = await db.rpc('claim_player', {
+    p_display_name: displayName,
+  });
 
   if (error) {
-    // Most likely someone already has that name (display_name is unique).
-    alert(`Couldn't use that name (${error.message}). Try a different one.`);
+    alert(`Couldn't use that name (${error.message}). Try again.`);
     return ensurePlayer();
   }
 
-  return created;
+  return claimed;
 }
 
 window.ensurePlayer = ensurePlayer;

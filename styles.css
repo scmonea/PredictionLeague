@@ -3,12 +3,12 @@
    from one place. */
 
 :root {
-  --bg: #0b1f14;
-  --bg-card: #123a24;
-  --border: #1f5136;
-  --text: #f4efe3;
-  --text-dim: #a9c2b3;
-  --accent: #e8c46a;   /* gold, for odds/highlights */
+  --bg: #1e1033;
+  --bg-card: #2f1b52;
+  --border: #4a2f7a;
+  --text: #f2ecf9;
+  --text-dim: #b8a3d4;
+  --accent: #c299f2;   /* violet, for odds/highlights */
   --win: #4caf7d;      /* green, correct picks / points */
   --loss: #d9736c;     /* red, wrong picks */
 }
@@ -135,6 +135,15 @@ button:hover {
   margin-top: 0.5rem;
   font-size: 0.85rem;
   color: var(--text-dim);
+}
+
+/* Only applied once there's a real points value to show (not the
+   placeholder/error text) -- green matches how points are shown
+   everywhere else on the site (leaderboard, status.ok). */
+.points-preview.has-points {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--win);
 }
 
 .status {

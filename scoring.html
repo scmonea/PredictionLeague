@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scoring - Prediction League</title>
+  <meta name="theme-color" content="#1e1033" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Prediction League</h1>
+    <nav>
+      <a href="index.html">Leaderboard</a>
+      <a href="predict.html">Predict</a>
+      <a href="scoring.html" class="active">Scoring</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <p>
+        Every match has odds for each result (home win / draw / away win),
+        set by bookmakers. When you predict a scoreline, you're backing one
+        of those three outcomes. How many points you get depends on
+        <strong>how unlikely your pick was</strong> and
+        <strong>how close you get</strong>.
+      </p>
+      <ul>
+        <li>Wrong side entirely (e.g. you picked a home win, away won) &rarr; <strong>0 points</strong>, no matter how close the score.</li>
+        <li>Right side, any score &rarr; <strong>the decimal odds you backed, rounded down.</strong></li>
+        <li>Right side <em>and</em> the goal difference also matches (even if the score itself isn't exact) &rarr; <strong>bonus points based on the margin</strong>: a 2-goal margin is worth +1, 3 is worth +2, up to a cap of +5 for a 6+ goal margin. A margin of 0-1 (most results) earns nothing here.</li>
+        <li>Right side <em>and</em> the exact score too &rarr; <strong>+3 more</strong> on top of that.</li>
+      </ul>
+    </div>
+  </main>
+</body>
+</html>

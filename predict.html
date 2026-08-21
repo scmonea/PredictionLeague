@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Predict - Prediction League</title>
-  <meta name="theme-color" content="#123a24" />
+  <meta name="theme-color" content="#1e1033" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="styles.css" />
@@ -15,7 +15,7 @@
     <nav>
       <a href="index.html">Leaderboard</a>
       <a href="predict.html" class="active">Predict</a>
-      <a href="fixtures.html">Fixtures</a>
+      <a href="scoring.html">Scoring</a>
     </nav>
   </header>
 
@@ -45,7 +45,7 @@
 
       return `
         <div class="card" data-fixture-id="${fixture.id}">
-          <div class="fixture-teams">${fixture.home_team} vs ${fixture.away_team}</div>
+          <div class="fixture-teams">${escapeHtml(fixture.home_team)} vs ${escapeHtml(fixture.away_team)}</div>
           <div class="fixture-meta">Kicks off ${kickoff}</div>
           <div class="odds-row">
             <span>Home ${fixture.odds_home ?? '-'}</span>
@@ -73,13 +73,21 @@
         const home = Number(homeInput.value);
         const away = Number(awayInput.value);
         if (homeInput.value === '' || awayInput.value === '') {
+          preview.classList.remove('has-points');
           preview.textContent = 'Enter a score to see how many points it could be worth.';
           return;
         }
         const points = previewPoints(fixture, home, away);
-        preview.textContent = points
-          ? `Worth ${points.ifCorrectWinner} pts if you get the winner right, ${points.ifExactScore} pts if you nail the exact score.`
-          : "Odds aren't loaded for this fixture yet.";
+        if (!points) {
+          preview.classList.remove('has-points');
+          preview.textContent = "Odds aren't loaded for this fixture yet.";
+          return;
+        }
+        // Just the two numbers players actually care about -- the
+        // goal-difference tier still counts toward real scoring, it's
+        // just not spelled out here to keep this glanceable.
+        preview.classList.add('has-points');
+        preview.textContent = `${points.ifCorrectWinner} pts for the correct result, ${points.ifExactScore} pts for the correct score.`;
       }
 
       homeInput.addEventListener('input', updatePreview);

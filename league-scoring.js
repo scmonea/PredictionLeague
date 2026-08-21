@@ -5,42 +5,51 @@
 // only for the preview, so keep the numbers here in sync with that SQL.
 
 const SCORING = {
-  BASE: 4,                        // multiplies sqrt(odds) for a correct winner/draw
-  FAVORITE_ODDS_THRESHOLD: 1.5,   // odds below this count as a "heavy favorite"
-  FAVORITE_PENALTY: 2,            // points subtracted for correctly backing a heavy favorite
-  MIN_CORRECT_PICK_POINTS: 1,     // a correct pick is never worth less than this
-  EXACT_BONUS_MULTIPLIER: 2,      // multiplies sqrt(odds) for the exact-score bonus...
-  EXACT_BONUS_CAP: 6,             // ...but the bonus never goes above this
+  GD_BONUS_CAP: 5,   // goal-difference bonus never exceeds this, however big the margin
+  EXACT_BONUS: 3,    // extra points for the exact score, on top of the GD bonus
 };
 
-// Backing a heavy favorite (short odds) is a much safer pick than backing
-// a toss-up or an underdog, so it's worth a bit less even when you're
-// right -- everything at or above the threshold is untouched.
+// Correct winner/draw is worth exactly the decimal odds you backed,
+// rounded down -- e.g. odds of 3.40 is worth 3 points, odds of 1.15 is
+// worth 1. Simple and literal: no square roots, no cap. The bigger the
+// underdog, the more it's worth, in direct proportion to how unlikely the
+// bookmakers thought it was.
 function basePoints(decimalOdds) {
-  let points = Math.round(SCORING.BASE * Math.sqrt(decimalOdds));
-  if (decimalOdds < SCORING.FAVORITE_ODDS_THRESHOLD) {
-    points = Math.max(SCORING.MIN_CORRECT_PICK_POINTS, points - SCORING.FAVORITE_PENALTY);
-  }
-  return points;
+  return Math.floor(decimalOdds);
 }
 
-// The exact-score bonus scales with odds like the base points do (nailing
-// an underdog's exact score is worth more than nailing a favorite's), but
-// is capped so a wild longshot can't blow the bonus up indefinitely.
-function exactScoreBonus(decimalOdds) {
-  return Math.min(SCORING.EXACT_BONUS_CAP, Math.round(SCORING.EXACT_BONUS_MULTIPLIER * Math.sqrt(decimalOdds)));
+// Scales with how big a correctly-matched goal difference is: a margin
+// of 2 goals is worth 1 point, 3 is worth 2, and so on up to the cap. A
+// margin of 0 or 1 (a draw, or a 1-0/2-1-style result -- the majority of
+// real matches) earns nothing here: this tier only rewards genuinely
+// calling a big margin, not just any correct margin. `max(0, ...)`
+// handles margins of 0-1 falling below zero before the cap kicks in.
+function goalDifferenceBonus(margin) {
+  return Math.max(0, Math.min(SCORING.GD_BONUS_CAP, margin - 1));
 }
 
-// decimalOdds: the odds for whichever outcome (home/draw/away) was picked.
-function pointsForCorrectPick(decimalOdds, isExactScore) {
+// Three tiers of accuracy, each including everything below it:
+//   'winner' -- right side, any score              -> base
+//   'gd'     -- right side + matching goal diff.    -> base + GD bonus
+//   'exact'  -- the exact score                     -> base + GD bonus + 3
+// Matching the exact score always matches the goal difference too (same
+// scores mean the same difference), so an exact hit gets both bonuses.
+function pointsForPick(decimalOdds, level, gdMargin) {
   const base = basePoints(decimalOdds);
-  return base + (isExactScore ? exactScoreBonus(decimalOdds) : 0);
+  const gdBonus = goalDifferenceBonus(gdMargin);
+  if (level === 'exact') return base + gdBonus + SCORING.EXACT_BONUS;
+  if (level === 'gd') return base + gdBonus;
+  return base;
 }
 
 // Works out which outcome a predicted score represents (home win / draw /
-// away win), looks up its odds on the fixture, and returns both possible
-// point values so the UI can show "X pts if just the winner, Y pts if the
-// exact score". Returns null if we don't have odds for this fixture yet.
+// away win), looks up its odds on the fixture, and returns all three
+// hypothetical point values so the UI can show what different levels of
+// accuracy on THIS prediction would be worth. The goal-difference margin
+// used is the predicted score's own margin -- for "if the actual result
+// also has this goal difference" to be true at all, the actual margin
+// must equal this one, by definition. Returns null if we don't have odds
+// for this fixture yet.
 function previewPoints(fixture, predictedHome, predictedAway) {
   let decimalOdds;
   if (predictedHome > predictedAway) decimalOdds = fixture.odds_home;
@@ -49,10 +58,13 @@ function previewPoints(fixture, predictedHome, predictedAway) {
 
   if (!decimalOdds) return null;
 
+  const gdMargin = Math.abs(predictedHome - predictedAway);
   return {
-    ifCorrectWinner: pointsForCorrectPick(decimalOdds, false),
-    ifExactScore: pointsForCorrectPick(decimalOdds, true),
+    ifCorrectWinner: pointsForPick(decimalOdds, 'winner', gdMargin),
+    ifCorrectGoalDifference: pointsForPick(decimalOdds, 'gd', gdMargin),
+    ifExactScore: pointsForPick(decimalOdds, 'exact', gdMargin),
   };
 }
 
 window.previewPoints = previewPoints;
+window.pointsForPick = pointsForPick;

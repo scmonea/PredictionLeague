@@ -183,9 +183,10 @@ create trigger on_prediction_lock_odds
 -- ============================================================
 -- Scoring: a function that turns locked-in odds into points, reused by
 -- both the live preview math you can eyeball here and the real trigger
--- below. Formula: round(4 * sqrt(odds)), minus 2 (floored at 1) if odds
--- were below 1.5 -- backing a heavy favorite is a safer pick, so it's
--- worth a little less even when you're right.
+-- below. Formula: floor(odds) -- a correct winner/draw is worth exactly
+-- the decimal odds you backed, rounded down. No square roots, no cap:
+-- the bigger the underdog, the more it's worth, in direct proportion to
+-- how unlikely the bookmakers thought it was.
 --
 -- Keep this in sync with league-scoring.js, which shows players the same
 -- numbers as a live preview before kickoff.
@@ -193,11 +194,7 @@ create trigger on_prediction_lock_odds
 create or replace function base_points_for_odds(v_odds numeric)
 returns numeric as $$
 begin
-  if v_odds < 1.5 then
-    return greatest(1, round(4 * sqrt(v_odds)) - 2);
-  else
-    return round(4 * sqrt(v_odds));
-  end if;
+  return floor(v_odds);
 end;
 $$ language plpgsql immutable;
 
@@ -205,13 +202,27 @@ $$ language plpgsql immutable;
 -- (home_score/away_score/status updated to 'finished' -- normally done by
 -- scripts/fetch-results.js, see the README). Scores every prediction
 -- against its OWN locked_odds, not the fixture's current odds.
+--
+-- Three tiers, each stacking on top of the last (all require the right
+-- side first):
+--   right side, any score              -> base_points_for_odds(odds)
+--   + goal difference also matches     -> scales with the margin: a
+--                                          2-goal margin is worth 1, a
+--                                          3-goal margin is worth 2, up to
+--                                          a cap of 5 (a 6+ goal margin).
+--                                          A margin of 0-1 earns nothing
+--                                          here -- greatest(0, margin - 1)
+--                                          handles that floor.
+--   + the exact score                  -> +3 more (implies GD matches too)
 create or replace function score_fixture_predictions()
 returns trigger as $$
 declare
   v_actual_sign int;   -- 1 = home win, -1 = away win, 0 = draw
+  v_actual_gd int;
 begin
   if new.status = 'finished' and new.home_score is not null and new.away_score is not null then
     v_actual_sign := sign(new.home_score - new.away_score);
+    v_actual_gd := new.home_score - new.away_score;
 
     update predictions p
     set points = case
@@ -220,9 +231,13 @@ begin
         then 0
       else
         base_points_for_odds(p.locked_odds)
-        + case when p.predicted_home_score = new.home_score and p.predicted_away_score = new.away_score
-               then least(6, round(2 * sqrt(p.locked_odds)))
+        + case when (p.predicted_home_score - p.predicted_away_score) = v_actual_gd
+               then greatest(0, least(5, abs(v_actual_gd) - 1))
                else 0 end
+        -- Flat +3 for an exact score, regardless of odds -- deliberately
+        -- not scaled, so a long-shot exact score can't dominate a season.
+        + case when p.predicted_home_score = new.home_score and p.predicted_away_score = new.away_score
+               then 3 else 0 end
       end
     where p.fixture_id = new.id;
   end if;
